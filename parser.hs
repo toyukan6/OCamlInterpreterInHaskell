@@ -6,7 +6,7 @@ import Text.ParserCombinators.Parsec.Expr (buildExpressionParser, Assoc(..), Ope
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import Text.ParserCombinators.Parsec.Language
 
-import Syntax (Exp(..), BinOp(..), Identifier(..), Type(..), Program(..))
+import Syntax (Exp(..), BinOp(..), Identifier(..), Type(..), Program(..), Cond(..))
 
 ocamlStyle = emptyDef {
              commentStart      = "(*"
@@ -65,7 +65,7 @@ table   = [[op "*" Mul AssocLeft]
         where op s f assoc = Infix (do{ reservedOp s; return (BinOpExp f)}) assoc
 
 parseAppExp =
-    (\l -> if length l == 1 then head l else AppExp l) <$> many1 (lexeme parseAExp)
+    (\l -> if length l == 1 then head l else foldl1 (\ x y -> AppExp x y) l) <$> many1 (lexeme parseAExp)
 
 parseAExp = parseNumber
             <|> parseVar
@@ -74,6 +74,7 @@ parseAExp = parseNumber
             <|> parseIf
             <|> parseFun
             <|> parseLet
+            <|> parseMatch
             <|> parens parseExpr
 
 parseIdentifier = Ident <$> identifier
@@ -106,3 +107,22 @@ parseLetExp =
 
 parseLetRecExp =
     LetRecExp <$> (reserved "let" *> reserved "rec" *> parseDecl `sepBy1` (reserved "and")) <*> (reserved "in" *> parseExpr)
+
+parseMatch =
+    MatchExp <$> (reserved "match" *> parseExpr) <*> (reserved "with" *> parseMatchPattern `sepBy1` (reservedOp "|"))
+
+parseMatchPattern = (\x y -> (x, y)) <$> (lexeme parseCond) <*> (reservedOp "->" *> parseExpr)
+
+parseCond = try parseConsCond
+            <|> parseValCond
+
+parseValCond = parseIntCond
+            <|> parseBoolCond
+            <|> parseVarCond
+            <|> parseListCond
+
+parseIntCond = (\(ILit n) -> IntCond n) <$> parseNumber
+parseBoolCond = (\(BLit b) -> BoolCond b) <$> parseBool
+parseVarCond = VarCond <$> parseIdentifier
+parseConsCond = foldr1 (\ x y -> ConsCond x y) <$> parseValCond `sepBy1` (reservedOp "::")
+parseListCond = ListCond <$> squares (parseCond `sepBy` semi)

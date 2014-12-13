@@ -46,7 +46,8 @@ data Exp = Var Identifier
          | FunExp [Identifier] Exp
          | LetExp [([Identifier], Exp)] Exp
          | LetRecExp [([Identifier], Exp)] Exp
-         | AppExp [Exp]
+         | AppExp Exp Exp
+         | MatchExp Exp [(Cond, Exp)]
            deriving (Show)
 
 data Exval = IntV Integer
@@ -56,3 +57,10 @@ data Exval = IntV Integer
              deriving (Show)
 
 type Dnval = Exval
+
+data Cond = IntCond Integer
+          | BoolCond Bool
+          | VarCond Identifier
+          | ConsCond Cond Cond
+          | ListCond [Cond]
+            deriving (Show)
